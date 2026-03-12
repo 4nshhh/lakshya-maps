@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Lakshya 2.0 — LDCE Campus Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --cyan:#00f5ff;
+  --neon-orange:#ff6b00;
+  --neon-pink:#ff0080;
+  --neon-green:#00ff88;
+  --dark:#020810;
+  --dark2:#050d1a;
+  --grid:#0a1628;
+  --glass:rgba(0,245,255,0.05);
+  --glass-border:rgba(0,245,255,0.15);
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);font-family:'Rajdhani',sans-serif;}
+
+/* SCANLINE OVERLAY */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,245,255,0.015) 2px,rgba(0,245,255,0.015) 4px);
+  pointer-events:none;z-index:1000;
+}
+
+/* HEADER */
+#header{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  padding:12px 16px;
+  background:linear-gradient(180deg,rgba(2,8,16,0.98) 0%,rgba(2,8,16,0) 100%);
+  display:flex;align-items:center;justify-content:space-between;
+}
+#logo{
+  font-family:'Orbitron',monospace;font-size:18px;font-weight:900;
+  color:var(--cyan);letter-spacing:3px;
+  text-shadow:0 0 20px var(--cyan),0 0 40px rgba(0,245,255,0.3);
+}
+#logo span{color:var(--neon-orange);font-size:11px;display:block;letter-spacing:6px;font-weight:400;margin-top:2px;}
+#compass{
+  width:36px;height:36px;border-radius:50%;
+  border:1px solid var(--glass-border);
+  background:var(--glass);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;cursor:pointer;
+  backdrop-filter:blur(10px);
+}
+
+/* SEARCH BAR */
+#searchbar{
+  position:fixed;top:72px;left:50%;transform:translateX(-50%);
+  z-index:200;width:calc(100% - 32px);max-width:420px;
+}
+#searchinput{
+  width:100%;padding:12px 16px 12px 42px;
+  background:rgba(5,13,26,0.9);
+  border:1px solid var(--glass-border);
+  border-radius:12px;
+  color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:13px;
+  outline:none;backdrop-filter:blur(20px);
+  box-shadow:0 0 20px rgba(0,245,255,0.1),inset 0 1px 0 rgba(255,255,255,0.05);
+  transition:all 0.3s;
+}
+#searchinput::placeholder{color:rgba(0,245,255,0.35);}
+#searchinput:focus{border-color:var(--cyan);box-shadow:0 0 30px rgba(0,245,255,0.2),inset 0 1px 0 rgba(255,255,255,0.05);}
+#searchicon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:rgba(0,245,255,0.5);font-size:16px;pointer-events:none;}
+#suggestions{
+  position:absolute;top:calc(100% + 4px);left:0;right:0;
+  background:rgba(5,13,26,0.97);border:1px solid var(--glass-border);
+  border-radius:10px;overflow:hidden;display:none;
+  backdrop-filter:blur(20px);
+}
+.suggestion-item{
+  padding:10px 16px;color:rgba(0,245,255,0.8);font-size:13px;
+  font-family:'Share Tech Mono',monospace;cursor:pointer;
+  border-bottom:1px solid rgba(0,245,255,0.07);
+  transition:background 0.2s;
+  display:flex;align-items:center;gap:10px;
+}
+.suggestion-item:hover{background:rgba(0,245,255,0.08);}
+.suggestion-item:last-child{border-bottom:none;}
+.sug-dot{width:8px;height:8px;border-radius:50%;}
+
+/* FILTER PILLS */
+#filters{
+  position:fixed;top:128px;left:0;right:0;z-index:200;
+  display:flex;gap:8px;padding:0 16px;
+  overflow-x:auto;scrollbar-width:none;
+}
+#filters::-webkit-scrollbar{display:none;}
+.pill{
+  flex-shrink:0;padding:6px 14px;border-radius:20px;
+  border:1px solid var(--glass-border);
+  background:rgba(5,13,26,0.85);
+  color:rgba(0,245,255,0.6);font-size:11px;font-weight:600;
+  letter-spacing:1px;cursor:pointer;
+  backdrop-filter:blur(10px);transition:all 0.25s;
+  white-space:nowrap;
+  font-family:'Orbitron',monospace;
+}
+.pill.active,.pill:hover{
+  border-color:var(--cyan);color:var(--cyan);
+  background:rgba(0,245,255,0.1);
+  box-shadow:0 0 15px rgba(0,245,255,0.2);
+}
+.pill.active-orange{border-color:var(--neon-orange);color:var(--neon-orange);background:rgba(255,107,0,0.1);box-shadow:0 0 15px rgba(255,107,0,0.2);}
+.pill.active-pink{border-color:var(--neon-pink);color:var(--neon-pink);background:rgba(255,0,128,0.1);box-shadow:0 0 15px rgba(255,0,128,0.2);}
+.pill.active-green{border-color:var(--neon-green);color:var(--neon-green);background:rgba(0,255,136,0.1);box-shadow:0 0 15px rgba(0,255,136,0.2);}
+
+/* CANVAS */
+#canvas{position:fixed;inset:0;touch-action:none;}
+
+/* INFO PANEL */
+#infopanel{
+  position:fixed;bottom:0;left:0;right:0;z-index:300;
+  background:rgba(2,8,16,0.97);
+  border-top:1px solid var(--glass-border);
+  border-radius:20px 20px 0 0;
+  padding:0 20px 32px;
+  transform:translateY(100%);
+  transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  backdrop-filter:blur(30px);
+  box-shadow:0 -20px 60px rgba(0,0,0,0.8),0 -1px 0 rgba(0,245,255,0.1);
+  max-height:60vh;overflow-y:auto;
+}
+#infopanel.open{transform:translateY(0);}
+#panel-handle{width:36px;height:3px;background:rgba(0,245,255,0.2);border-radius:2px;margin:12px auto 16px;}
+#panel-close{
+  position:absolute;top:16px;right:20px;
+  width:28px;height:28px;border-radius:50%;
+  border:1px solid var(--glass-border);
+  background:transparent;color:rgba(0,245,255,0.5);
+  font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+#panel-category{
+  font-family:'Orbitron',monospace;font-size:9px;letter-spacing:3px;
+  margin-bottom:6px;
+}
+#panel-name{
+  font-family:'Orbitron',monospace;font-size:20px;font-weight:700;
+  color:white;margin-bottom:4px;line-height:1.2;
+}
+#panel-desc{
+  font-size:13px;color:rgba(255,255,255,0.5);
+  margin-bottom:16px;line-height:1.5;
+}
+#panel-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;}
+.tag{
+  padding:4px 10px;border-radius:6px;font-size:10px;
+  font-family:'Orbitron',monospace;letter-spacing:1px;
+  border:1px solid;
+}
+#panel-actions{display:flex;gap:10px;}
+.btn-action{
+  flex:1;padding:12px;border-radius:10px;
+  font-family:'Orbitron',monospace;font-size:11px;font-weight:600;
+  letter-spacing:1px;cursor:pointer;border:none;
+  transition:all 0.2s;
+}
+.btn-primary{
+  background:linear-gradient(135deg,rgba(0,245,255,0.15),rgba(0,245,255,0.05));
+  border:1px solid var(--cyan);color:var(--cyan);
+}
+.btn-primary:hover{background:rgba(0,245,255,0.2);box-shadow:0 0 20px rgba(0,245,255,0.3);}
+.btn-secondary{
+  background:linear-gradient(135deg,rgba(255,107,0,0.15),rgba(255,107,0,0.05));
+  border:1px solid var(--neon-orange);color:var(--neon-orange);
+}
+
+/* MINIMAP */
+#minimap{
+  position:fixed;bottom:20px;right:16px;z-index:200;
+  width:80px;height:80px;border-radius:10px;
+  border:1px solid var(--glass-border);
+  background:rgba(5,13,26,0.9);
+  backdrop-filter:blur(10px);overflow:hidden;
+}
+#minimap canvas{width:100%;height:100%;}
+
+/* CONTROLS */
+#controls{
+  position:fixed;right:16px;bottom:112px;z-index:200;
+  display:flex;flex-direction:column;gap:8px;
+}
+.ctrl-btn{
+  width:36px;height:36px;border-radius:8px;
+  border:1px solid var(--glass-border);
+  background:rgba(5,13,26,0.9);backdrop-filter:blur(10px);
+  color:rgba(0,245,255,0.7);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s;
+}
+.ctrl-btn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(0,245,255,0.2);}
+
+/* LEGEND */
+#legend{
+  position:fixed;left:16px;bottom:20px;z-index:200;
+}
+#legend-toggle{
+  padding:6px 12px;border-radius:8px;
+  border:1px solid var(--glass-border);
+  background:rgba(5,13,26,0.9);backdrop-filter:blur(10px);
+  color:rgba(0,245,255,0.6);font-family:'Orbitron',monospace;
+  font-size:9px;letter-spacing:1px;cursor:pointer;
+}
+#legend-content{
+  display:none;
+  position:absolute;bottom:calc(100% + 8px);left:0;
+  background:rgba(5,13,26,0.97);border:1px solid var(--glass-border);
+  border-radius:10px;padding:12px;min-width:180px;
+  backdrop-filter:blur(20px);
+}
+#legend-content.show{display:block;}
+.legend-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;color:rgba(255,255,255,0.6);}
+.legend-row:last-child{margin-bottom:0;}
+.legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+
+/* TOAST */
+#toast{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.8);
+  background:rgba(5,13,26,0.97);border:1px solid var(--cyan);
+  border-radius:12px;padding:12px 20px;
+  font-family:'Orbitron',monospace;font-size:11px;color:var(--cyan);
+  letter-spacing:1px;text-align:center;z-index:500;
+  opacity:0;transition:all 0.3s;pointer-events:none;
+  box-shadow:0 0 30px rgba(0,245,255,0.2);
+}
+#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+
+/* LOADING */
+#loading{
+  position:fixed;inset:0;z-index:600;
+  background:var(--dark);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;
+}
+#loading-title{
+  font-family:'Orbitron',monospace;font-size:28px;font-weight:900;
+  color:var(--cyan);letter-spacing:4px;
+  text-shadow:0 0 30px var(--cyan);
+  animation:pulse 2s ease-in-out infinite;
+}
+#loading-sub{font-family:'Share Tech Mono',monospace;font-size:12px;color:rgba(0,245,255,0.4);letter-spacing:4px;}
+#loading-bar-wrap{width:200px;height:2px;background:rgba(0,245,255,0.1);border-radius:2px;overflow:hidden;}
+#loading-bar{height:100%;width:0%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);transition:width 0.1s;border-radius:2px;}
+@keyframes pulse{0%,100%{text-shadow:0 0 30px var(--cyan);}50%{text-shadow:0 0 60px var(--cyan),0 0 100px rgba(0,245,255,0.5);}}
+
+/* DIRECTION PATH ANIMATION */
+@keyframes pathFlow{
+  0%{stroke-dashoffset:1000;}
+  100%{stroke-dashoffset:0;}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div id="loading-title">LAKSHYA 2.0</div>
+  <div id="loading-sub">INITIALIZING CAMPUS MAP</div>
+  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+</div>
+
+<!-- HEADER -->
+<div id="header">
+  <div id="logo">LAKSHYA 2.0<span>LDCE · CAMPUS MAP</span></div>
+  <div id="compass">🧭</div>
+</div>
+
+<!-- SEARCH -->
+<div id="searchbar">
+  <span id="searchicon">⌕</span>
+  <input id="searchinput" type="text" placeholder="Search locations..."/>
+  <div id="suggestions"></div>
+</div>
+
+<!-- FILTERS -->
+<div id="filters">
+  <div class="pill active" data-filter="all">ALL</div>
+  <div class="pill" data-filter="event">🎪 EVENTS</div>
+  <div class="pill" data-filter="food">🍕 FOOD</div>
+  <div class="pill" data-filter="facility">🚻 FACILITIES</div>
+  <div class="pill" data-filter="academic">🏛️ ACADEMIC</div>
+  <div class="pill" data-filter="parking">🅿️ PARKING</div>
+</div>
+
+<!-- CANVAS -->
+<canvas id="canvas"></canvas>
+
+<!-- CONTROLS -->
+<div id="controls">
+  <button class="ctrl-btn" id="btn-3d" title="Toggle View">⬡</button>
+  <button class="ctrl-btn" id="btn-tiltup" title="Tilt Up">▲</button>
+  <button class="ctrl-btn" id="btn-tiltdn" title="Tilt Down">▼</button>
+  <button class="ctrl-btn" id="btn-zoomin" title="Zoom In">+</button>
+  <button class="ctrl-btn" id="btn-zoomout" title="Zoom Out">−</button>
+  <button class="ctrl-btn" id="btn-reset" title="Reset View">⊙</button>
+</div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <button id="legend-toggle">◈ LEGEND</button>
+  <div id="legend-content">
+    <div class="legend-row"><div class="legend-dot" style="background:#ff0080"></div>Event Venue</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#ff6b00"></div>Food & Canteen</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#00f5ff"></div>Academic Block</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#00ff88"></div>Open Area / Lawn</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#a855f7"></div>Special Facility</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#facc15"></div>Drawing Hall</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#6b7280"></div>Hostel / Residential</div>
+  </div>
+</div>
+
+<!-- MINIMAP -->
+<div id="minimap"><canvas id="minimap-canvas" width="80" height="80"></canvas></div>
+
+<!-- INFO PANEL -->
+<div id="infopanel">
+  <div id="panel-handle"></div>
+  <button id="panel-close">✕</button>
+  <div id="panel-category"></div>
+  <div id="panel-name"></div>
+  <div id="panel-desc"></div>
+  <div id="panel-tags"></div>
+  <div id="panel-actions">
+    <button class="btn-action btn-primary" id="btn-directions">⟶ DIRECTIONS</button>
+    <button class="btn-action btn-secondary" id="btn-share">↗ SHARE</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// LDCE CAMPUS DATA (based on real map)
+// ══════════════════════════════════════════
+// ── Map coordinate system ──────────────────────────────────────────────────
+// The 2D reference map is ~800×760 px. We trace building footprints directly
+// from that image so positions match the real campus layout.
+// Origin (0,0) = top-left corner of the campus boundary.
+// University Road runs along the LEFT edge (x≈0-30).
+// Main Gates are at the BOTTOM (y≈720).
+// Hostel zone is at the TOP (y≈0-200).
+// ──────────────────────────────────────────────────────────────────────────
+const BUILDINGS = [
+  // ── HOSTEL ZONE (top strip) ────────────────────────────────────────────
+  // PG & Boys Hostel — top-left L-shaped cluster
+  {id:'pgboys', name:'PG & Boys Hostel', fullName:'PG & Boys Hostel',
+    desc:'Postgraduate and Boys hostel buildings.',
+    x:30,  y:90,  w:105, h:120, color:'#6b7280', h3d:32, category:'facility', tags:['Hostel','Residential'], icon:'🏠'},
+  // Staff Quarters — upper centre-left
+  {id:'staff_q', name:'Staff Quarters', fullName:'Staff Quarters',
+    desc:'Residential quarters for faculty and staff.',
+    x:175, y:65,  w:80,  h:55,  color:'#6b7280', h3d:24, category:'facility', tags:['Residential','Staff'], icon:'🏘️'},
+  // Mess — just right of staff quarters
+  {id:'mess', name:'Mess', fullName:'Hostel Mess',
+    desc:'Hostel dining mess — serves breakfast, lunch & dinner.',
+    x:280, y:65,  w:75,  h:45,  color:'#ff6b00', h3d:16, category:'food',     tags:['Food','Meals','Hostel'], icon:'🍽️'},
+  // Hostel A, B, C — horizontal strip below mess/staff
+  {id:'hostelA', name:'Hostel A', fullName:'Hostel Block A',
+    desc:'Student hostel block A.',
+    x:175, y:150, w:58,  h:48,  color:'#6b7280', h3d:22, category:'facility', tags:['Hostel'], icon:'🏠'},
+  {id:'hostelB', name:'Hostel B', fullName:'Hostel Block B',
+    desc:'Student hostel block B.',
+    x:250, y:150, w:58,  h:48,  color:'#6b7280', h3d:22, category:'facility', tags:['Hostel'], icon:'🏠'},
+  {id:'hostelC', name:'Hostel C', fullName:'Hostel Block C',
+    desc:'Student hostel block C.',
+    x:325, y:150, w:58,  h:48,  color:'#6b7280', h3d:22, category:'facility', tags:['Hostel'], icon:'🏠'},
+  // Hostel D — left column below PG hostel (part of A-D row on map)
+  {id:'hostelD', name:'Hostel D', fullName:'Hostel Block D',
+    desc:'Student hostel block D.',
+    x:110, y:180, w:55,  h:48,  color:'#6b7280', h3d:22, category:'facility', tags:['Hostel'], icon:'🏠'},
+  // Hostel E & F — top centre-right
+  {id:'hostelEF', name:'Hostel E & F', fullName:'Hostel Blocks E & F',
+    desc:'Hostel blocks E and F for students.',
+    x:400, y:65,  w:145, h:75,  color:'#6b7280', h3d:26, category:'facility', tags:['Hostel'], icon:'🏠'},
+  // Girls Hostel — top far right
+  {id:'girls_hostel', name:'Girls Hostel', fullName:'Girls Hostel',
+    desc:'Girls residential hostel.',
+    x:620, y:55,  w:120, h:60,  color:'#ec4899', h3d:24, category:'facility', tags:['Hostel','Girls'], icon:'🏠'},
+
+  // ── MAIN ACADEMIC GRID (below hostel road, y≈250 downward) ────────────
+  // Block 2 — tall vertical block on west side of main grid
+  {id:'b2', name:'Block 2', fullName:'Engineering Block',
+    desc:'Electrical, Computer, IC, Civil (PG-WRM)',
+    x:145, y:270, w:62,  h:165, color:'#00f5ff', h3d:36, category:'academic', tags:['Electrical','Computer','Civil'], icon:'⚡'},
+  // Vishwakarma Hall — prominent blue block inside Block 2 zone (west)
+  {id:'vishall', name:'Vish. Hall', fullName:'Vishwakarma Hall',
+    desc:'Main auditorium and event venue for Lakshya 2.0.',
+    x:148, y:370, w:88,  h:48,  color:'#00bfff', h3d:24, category:'event',    tags:['Auditorium','Main Stage','Lakshya 2.0'], icon:'🎭'},
+  // Block 1 — bottom-left two sub-buildings
+  {id:'b1a', name:'Block 1', fullName:'LRC Block (North)',
+    desc:'Library & Resource Centre — north wing.',
+    x:48,  y:490, w:80,  h:65,  color:'#00f5ff', h3d:24, category:'academic', tags:['Library','LRC'], icon:'📚'},
+  {id:'b1b', name:'Block 1', fullName:'LRC Block (South)',
+    desc:'Library & Resource Centre — south wing.',
+    x:48,  y:570, w:80,  h:65,  color:'#00f5ff', h3d:24, category:'academic', tags:['Library','LRC'], icon:'📚'},
+
+  // Tennis Court — small square above Block 5
+  {id:'tennis', name:'Tennis Court', fullName:'Tennis Court',
+    desc:'Tennis courts — also used for badminton and table tennis competitions.',
+    x:258, y:268, w:75,  h:62,  color:'#22c55e', h3d:4,  category:'event',    tags:['Sports','Tennis'], icon:'🎾'},
+  // Canteen — small block right of tennis court
+  {id:'canteen', name:'Canteen', fullName:'Main Canteen',
+    desc:'College canteen serving hot meals and snacks.',
+    x:348, y:268, w:65,  h:50,  color:'#ff6b00', h3d:16, category:'food',     tags:['Food','Snacks','Meals'], icon:'🍕'},
+  // Block 5 — large central block (Workshop / Mech Engg)
+  {id:'b5', name:'Block 5', fullName:'Workshop Block',
+    desc:'Students Store, Workshop, Mech Engg, Automobile.',
+    x:258, y:340, w:155, h:165, color:'#00f5ff', h3d:30, category:'academic', tags:['Workshop','Automobile','Mech Engg'], icon:'🔧'},
+  // Civil Drawing Hall (Block 3) — small label inside Block 5 area lower-left
+  {id:'b3', name:'Civil DH', fullName:'Civil Drawing Hall',
+    desc:'Civil Engineering Drawing Hall (Block 3).',
+    x:258, y:470, w:70,  h:50,  color:'#facc15', h3d:18, category:'academic', tags:['Drawing Hall','Civil Engg'], icon:'📐'},
+  // Mech Drawing Hall (Block 4) — small label inside Block 5 area lower-right
+  {id:'b4', name:'Mech DH', fullName:'Mech Drawing Hall',
+    desc:'Mechanical Drawing Hall (Block 4).',
+    x:340, y:470, w:70,  h:50,  color:'#facc15', h3d:18, category:'academic', tags:['Drawing Hall','Mechanical'], icon:'⚙️'},
+  // Siemens CoE — small purple block inside Block 5 mid area
+  {id:'siemens', name:'Siemens CoE', fullName:'Siemens Centre of Excellence',
+    desc:'High-tech lab for innovation events and tech exhibitions.',
+    x:330, y:395, w:42,  h:38,  color:'#a855f7', h3d:18, category:'event',    tags:['Lab','Exhibition','Innovation'], icon:'⚡'},
+  // Keepsake Welding — small orange block (shown as orange square on map, Block 5 area)
+  {id:'keepsake', name:'Keepsake CoE', fullName:'Keepsake Welding CoE',
+    desc:'Centre of Excellence for welding and manufacturing demos.',
+    x:258, y:360, w:42,  h:35,  color:'#f97316', h3d:14, category:'event',    tags:['Workshop','Demo'], icon:'🔥'},
+
+  // Block 6 — tall vertical block right of Block 5
+  {id:'b6', name:'Block 6', fullName:'Mech Engg Block',
+    desc:'Mech Engineering, Applied Mechanics, LAA Office.',
+    x:430, y:270, w:62,  h:165, color:'#00f5ff', h3d:28, category:'academic', tags:['Applied Mechanics','LAA'], icon:'🏗️'},
+  // Block 7 — large block far right lower
+  {id:'b7', name:'Block 7', fullName:'Chemical Engg Block',
+    desc:'Chemical Engineering, Rubber & Plastics.',
+    x:520, y:395, w:105, h:135, color:'#00f5ff', h3d:28, category:'academic', tags:['Chemical Engg','Rubber'], icon:'🧪'},
+  // Block 8 — three sub-blocks top-right area
+  {id:'b8a', name:'Block 8', fullName:'Textile Technology (A)',
+    desc:'Textile Technology Department.',
+    x:500, y:215, w:65,  h:65,  color:'#00f5ff', h3d:22, category:'academic', tags:['Textile'], icon:'🧵'},
+  {id:'b8b', name:'Block 8', fullName:'Textile Technology (B)',
+    desc:'Textile Technology Block B.',
+    x:575, y:215, w:65,  h:65,  color:'#00f5ff', h3d:22, category:'academic', tags:['Textile'], icon:'🧵'},
+  {id:'b8c', name:'Block 8', fullName:'Textile Technology (C)',
+    desc:'Textile Technology Block C.',
+    x:648, y:258, w:48,  h:48,  color:'#00f5ff', h3d:20, category:'academic', tags:['Textile'], icon:'🧵'},
+  // Block 9 — top far right (tree-like shape, approx rectangle)
+  {id:'b9', name:'Block 9', fullName:'EC Engineering',
+    desc:'Electronics & Communication Engineering, Environment.',
+    x:640, y:165, w:110, h:85,  color:'#00f5ff', h3d:30, category:'academic', tags:['EC Engg','Environment'], icon:'📡'},
+  // Block 10 — Annexe, right of Block 6
+  {id:'b10', name:'Block 10', fullName:'Annexe Building',
+    desc:'BM, IT & MCA Departments.',
+    x:500, y:340, w:115, h:88,  color:'#00a8ff', h3d:26, category:'academic', tags:['IT','BM','MCA'], icon:'💻'},
+
+  // ── SOUTH AREA (below central road) ───────────────────────────────────
+  // Block 0 — Main Block / Principal Office (centre south)
+  {id:'b0', name:'Block 0', fullName:'Main Block',
+    desc:'Principal Office & Civil Conference Room.',
+    x:258, y:575, w:155, h:70,  color:'#00f5ff', h3d:32, category:'academic', tags:['Principal Office','Conference Room'], icon:'🏛️'},
+  // Central Square label — just above Block 0
+  {id:'central_sq', name:'Central Square', fullName:'Central Square',
+    desc:'The main hub of Lakshya 2.0 — food stalls, performances, and gathering point.',
+    x:290, y:550, w:90,  h:22,  color:'#ef4444', h3d:6,  category:'food',     tags:['Food Hub','Stage','Gathering'], icon:'🎪'},
+  // Civil Lawn — large green semicircle area bottom-centre-left
+  {id:'civil_lawn', name:'Civil Lawn', fullName:'Civil Lawn',
+    desc:'Open lawn area for outdoor events, cultural performances and food stalls during Lakshya 2.0.',
+    x:210, y:620, w:130, h:115, color:'#00ff88', h3d:4,  category:'event',    tags:['Outdoor','Cultural','Food Zone'], icon:'🌿'},
+  // Cricket Ground — oval bottom-centre-right
+  {id:'cricket', name:'Cricket Ground', fullName:'Cricket Ground',
+    desc:'Sports venue for cricket and outdoor competitions.',
+    x:390, y:595, w:155, h:145, color:'#a16207', h3d:4,  category:'event',    tags:['Sports','Cricket'], icon:'🏏'},
+  // Washrooms near cricket ground
+  {id:'wc1', name:'Washroom', fullName:'Washroom (West)',
+    desc:'Washroom near cricket ground west entrance.',
+    x:384, y:625, w:24,  h:24,  color:'#38bdf8', h3d:10, category:'facility', tags:['Washroom'], icon:'🚻'},
+  {id:'wc2', name:'Washroom', fullName:'Washroom (East)',
+    desc:'Washroom near cricket ground east side.',
+    x:384, y:665, w:24,  h:24,  color:'#38bdf8', h3d:10, category:'facility', tags:['Washroom'], icon:'🚻'},
+
+  // ── GATES ──────────────────────────────────────────────────────────────
+  {id:'gate1', name:'Main Gate 1', fullName:'Main Entrance Gate 1',
+    desc:'Primary entrance to LDCE campus. Registration desk nearby.',
+    x:390, y:748, w:75,  h:18,  color:'#fbbf24', h3d:8,  category:'parking',  tags:['Entry','Registration'], icon:'🚪'},
+  {id:'gate2', name:'Main Gate 2', fullName:'Main Gate 2',
+    desc:'Secondary main entrance to the campus.',
+    x:245, y:748, w:75,  h:18,  color:'#fbbf24', h3d:8,  category:'parking',  tags:['Entry'], icon:'🚪'},
+  {id:'hostel_gate', name:'Hostel Gate', fullName:'Hostel Gate',
+    desc:'Side gate near hostel zone and University Road.',
+    x:30,  y:355, w:18,  h:38,  color:'#fbbf24', h3d:8,  category:'parking',  tags:['Side Gate'], icon:'🚪'},
+];
+
+// ══════════════════════════════════════════
+// CANVAS & STATE
+// ══════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const mmCanvas = document.getElementById('minimap-canvas');
+const mmCtx = mmCanvas.getContext('2d');
+
+let W, H;
+// Camera: pan (panX/panY), zoom, and two orbit angles (rotY=yaw around vertical, tilt=pitch)
+let cam = {
+  panX: 0, panY: 0,
+  zoom: 0.72,          // fits MAP_W=760 comfortably on most phone screens
+  rotY: 0,             // yaw: 0 = north-up
+  tilt: 0.58,          // pitch ~33° — classic readable isometric angle
+};
+// orbit drag state
+let orbitDragging = false;
+let orbitStart = {x:0, y:0, rotY:0, tilt:0};
+
+let selectedBuilding = null;
+let highlightedBuilding = null;
+let activeFilter = 'all';
+let directionFrom = null;
+let directionTo = null;
+let isDragging = false;
+let lastTouch = null;
+let lastPinchDist = 0;
+let pointerStart = null;
+let view3D = true;
+let animFrame = 0;
+let pathAnim = 0;
+
+const MAP_W = 760, MAP_H = 770;
+// Map centre in map-space — we'll always project around this pivot
+const MAP_CX = MAP_W / 2, MAP_CY = MAP_H / 2;
+let W2 = 0, H2 = 0;   // screen centre, updated in resize()
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  W2 = W / 2;
+  H2 = H / 2;
+}
+
+// ══════════════════════════════════════════
+// COORDINATE TRANSFORMS  (proper 3-D iso)
+// ══════════════════════════════════════════
+// Project map-space (mx,my,mz) → screen (sx,sy).
+// We first rotate in the XY plane (rotY / yaw), then apply a
+// perspective-free parallel tilt (cam.tilt) to compress the Y axis.
+// Z (height) always goes straight up on screen.
+function project(mx, my, mz) {
+  // Translate so the map centre is at origin
+  const rx = mx - MAP_CX;
+  const ry = my - MAP_CY;
+
+  if (!view3D) {
+    // Pure top-down flat, just pan+zoom, no rotation
+    return {
+      x: W2 + cam.panX + rx * cam.zoom,
+      y: H2 + cam.panY + ry * cam.zoom
+    };
+  }
+
+  // Yaw rotation around the vertical axis
+  const cosY = Math.cos(cam.rotY), sinY = Math.sin(cam.rotY);
+  const rx2 =  rx * cosY + ry * sinY;
+  const ry2 = -rx * sinY + ry * cosY;
+
+  // Tilt: compress the depth axis and lift Z
+  const cosTilt = Math.cos(cam.tilt);
+  const sinTilt = Math.sin(cam.tilt);
+  const screenX = rx2;
+  const screenY = ry2 * cosTilt - (mz || 0) * sinTilt;
+
+  return {
+    x: W2 + cam.panX + screenX * cam.zoom,
+    y: H2 + cam.panY + screenY * cam.zoom
+  };
+}
+
+// Convenience wrappers kept for compatibility
+function iso(mx, my, mz) { return project(mx, my, mz || 0); }
+function toScreen(mx, my) { return project(mx, my, 0); }
+
+// Inverse project for hit-testing (flat, mz=0):
+// Only valid when view3D is false or tilt is small. We use it for hit-testing
+// by un-rotating — good enough for tap detection.
+function toMap(sx, sy) {
+  const rx = (sx - W2 - cam.panX) / cam.zoom;
+  const ry = (sy - H2 - cam.panY) / cam.zoom / Math.cos(cam.tilt);
+  const cosY = Math.cos(-cam.rotY), sinY = Math.sin(-cam.rotY);
+  return {
+    x:  rx * cosY + ry * sinY + MAP_CX,
+    y: -rx * sinY + ry * cosY + MAP_CY
+  };
+}
+
+function isoTop(b) {
+  return project(b.x + b.w/2, b.y + b.h/2, b.h3d);
+}
+
+// ══════════════════════════════════════════
+// DRAWING
+// ══════════════════════════════════════════
+function hexAlpha(hex, a) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), bl=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${bl},${a})`;
+}
+
+function drawGrid() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,245,255,0.035)';
+  ctx.lineWidth = 0.5;
+  // Screen-space grid — no map coords needed
+  const step = 44;
+  const ox = ((cam.panX % step) + step) % step;
+  const oy = ((cam.panY % step) + step) % step;
+  for(let x = ox; x < W; x += step) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for(let y = oy; y < H; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawGround() {
+  ctx.save();
+  // Roads derived from the real LDCE map:
+  // - University Road: runs vertically along the left edge (x≈30)
+  // - Hostel Road: horizontal across top of main academic area (y≈250)
+  // - South Road: horizontal across bottom (y≈740)
+  // - Internal vertical roads: x≈145, x≈415, x≈498
+  // - Internal horizontal roads: y≈430 (between Block2/Vish and Block0/CivilLawn)
+  // - Block 7 access road: x≈500 short vertical spur
+  const roads = [
+    // University Road (left side, vertical)
+    [30,  0,   30,  770, 22],
+    // Hostel-to-main boundary road (horizontal, top of academic area)
+    [30,  248, 760, 248, 18],
+    // South boundary road (along gates)
+    [30,  740, 760, 740, 18],
+    // Main internal vertical: between Block2 and Block5/6
+    [143, 248, 143, 560, 18],
+    // Main internal vertical: between Block5/6 and Block7/10
+    [415, 248, 415, 760, 18],
+    // Far-right vertical: east of Block 7 / Block 8-9 zone
+    [498, 248, 498, 760, 16],
+    // Mid horizontal: connects Block2 bottom to cricket ground top
+    [30,  543, 760, 543, 16],
+    // Short internal east-west: top of Block 6/8/9 area
+    [415, 165, 760, 165, 14],
+    // Hostel internal road (top strip)
+    [30,  145, 560, 145, 14],
+  ];
+  for(const [x1,y1,x2,y2,rw] of roads) {
+    const p1 = project(x1, y1, 0), p2 = project(x2, y2, 0);
+    // Road fill
+    ctx.strokeStyle = 'rgba(0,245,255,0.055)';
+    ctx.lineWidth = rw * cam.zoom;
+    ctx.lineCap = 'square';
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    // Centre dashes
+    ctx.strokeStyle = 'rgba(0,245,255,0.14)';
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([7*cam.zoom, 9*cam.zoom]);
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════
+// ROAD GRAPH + A* PATHFINDING
+// ══════════════════════════════════════════
+// Node positions (mx, my) on road centrelines matched to drawGround() roads.
+const ROAD_NODES = [
+  // University Road spine (left)
+  {id:'n_ur0',  x:30,  y:30 },
+  {id:'n_ur1',  x:30,  y:145},
+  {id:'n_ur2',  x:30,  y:248},
+  {id:'n_ur3',  x:30,  y:355},  // Hostel Gate
+  {id:'n_ur4',  x:30,  y:430},
+  {id:'n_ur5',  x:30,  y:543},
+  {id:'n_ur6',  x:30,  y:650},
+  {id:'n_ur7',  x:30,  y:740},
+
+  // Top hostel road (y=145 horizontal)
+  {id:'n_h145a', x:143, y:145},
+  {id:'n_h145b', x:280, y:145},
+  {id:'n_h145c', x:415, y:145},
+  {id:'n_h145d', x:560, y:145},
+
+  // Top-of-academic road (y=248 horizontal) 
+  {id:'n_r248a', x:143, y:248},
+  {id:'n_r248b', x:258, y:248},
+  {id:'n_r248c', x:348, y:248},
+  {id:'n_r248d', x:415, y:248},
+  {id:'n_r248e', x:498, y:248},
+  {id:'n_r248f', x:640, y:248},
+  {id:'n_r248g', x:760, y:248},
+
+  // Right-side upper road (y=165 horizontal)
+  {id:'n_r165a', x:415, y:165},
+  {id:'n_r165b', x:560, y:165},
+  {id:'n_r165c', x:640, y:165},
+  {id:'n_r165d', x:760, y:165},
+
+  // Internal vertical: x=143
+  {id:'n_v143a', x:143, y:355},
+  {id:'n_v143b', x:143, y:430},
+  {id:'n_v143c', x:143, y:543},
+  {id:'n_v143d', x:143, y:620},
+  {id:'n_v143e', x:143, y:740},
+
+  // Internal vertical: x=415
+  {id:'n_v415a', x:415, y:355},
+  {id:'n_v415b', x:415, y:430},
+  {id:'n_v415c', x:415, y:543},
+  {id:'n_v415d', x:415, y:620},
+  {id:'n_v415e', x:415, y:740},
+
+  // Internal vertical: x=498
+  {id:'n_v498a', x:498, y:355},
+  {id:'n_v498b', x:498, y:430},
+  {id:'n_v498c', x:498, y:543},
+  {id:'n_v498d', x:498, y:620},
+  {id:'n_v498e', x:498, y:740},
+
+  // Mid horizontal: y=543
+  {id:'n_r543a', x:143, y:543},
+  {id:'n_r543b', x:258, y:543},
+  {id:'n_r543c', x:415, y:543},
+  {id:'n_r543d', x:498, y:543},
+  {id:'n_r543e', x:640, y:543},
+  {id:'n_r543f', x:760, y:543},
+
+  // South road: y=740
+  {id:'n_s740a', x:143, y:740},
+  {id:'n_s740b', x:283, y:740},  // Gate 2 area
+  {id:'n_s740c', x:415, y:740},
+  {id:'n_s740d', x:428, y:740},  // Gate 1 area
+  {id:'n_s740e', x:498, y:740},
+  {id:'n_s740f', x:640, y:740},
+  {id:'n_s740g', x:760, y:740},
+];
+
+// Edges — pairs of node ids that are directly connected
+const ROAD_EDGES = [
+  // University Road vertical
+  ['n_ur0','n_ur1'],['n_ur1','n_ur2'],['n_ur2','n_ur3'],['n_ur3','n_ur4'],
+  ['n_ur4','n_ur5'],['n_ur5','n_ur6'],['n_ur6','n_ur7'],
+
+  // Hostel road horizontal y=145
+  ['n_ur1','n_h145a'],['n_h145a','n_h145b'],['n_h145b','n_h145c'],['n_h145c','n_h145d'],
+
+  // Link hostel road to academic top
+  ['n_h145a','n_r248a'],['n_h145b','n_r248b'],['n_h145c','n_r248d'],
+
+  // Academic top road y=248
+  ['n_ur2','n_r248a'],['n_r248a','n_r248b'],['n_r248b','n_r248c'],['n_r248c','n_r248d'],
+  ['n_r248d','n_r248e'],['n_r248e','n_r248f'],['n_r248f','n_r248g'],
+
+  // Right-upper road y=165
+  ['n_r165a','n_r165b'],['n_r165b','n_r165c'],['n_r165c','n_r165d'],
+  ['n_r248d','n_r165a'],['n_r248e','n_r165b'],['n_r248f','n_r165c'],
+
+  // Vertical x=143
+  ['n_r248a','n_v143a'],['n_v143a','n_v143b'],['n_v143b','n_r543a'],
+  ['n_r543a','n_v143c'],['n_v143c','n_v143d'],['n_v143d','n_s740a'],
+
+  // Vertical x=415
+  ['n_r248d','n_v415a'],['n_v415a','n_v415b'],['n_v415b','n_r543c'],
+  ['n_r543c','n_v415c'],['n_v415c','n_v415d'],['n_v415d','n_s740c'],
+
+  // Vertical x=498
+  ['n_r248e','n_v498a'],['n_v498a','n_v498b'],['n_v498b','n_r543d'],
+  ['n_r543d','n_v498c'],['n_v498c','n_v498d'],['n_v498d','n_s740e'],
+
+  // Mid horizontal y=543
+  ['n_ur5','n_r543a'],['n_r543a','n_r543b'],['n_r543b','n_r543c'],
+  ['n_r543c','n_r543d'],['n_r543d','n_r543e'],['n_r543e','n_r543f'],
+  // Align duplicate node names (n_v143c == n_r543a etc — same coords, treat as same)
+
+  // South road y=740
+  ['n_ur7','n_s740a'],['n_s740a','n_s740b'],['n_s740b','n_s740c'],
+  ['n_s740c','n_s740d'],['n_s740d','n_s740e'],['n_s740e','n_s740f'],['n_s740f','n_s740g'],
+];
+
+// Build adjacency map
+const _nodeMap = {};
+ROAD_NODES.forEach(n => { _nodeMap[n.id] = n; });
+const _adj = {};
+ROAD_NODES.forEach(n => { _adj[n.id] = []; });
+ROAD_EDGES.forEach(([a,b]) => {
+  if(_nodeMap[a] && _nodeMap[b]) {
+    const d = Math.hypot(_nodeMap[a].x-_nodeMap[b].x, _nodeMap[a].y-_nodeMap[b].y);
+    _adj[a].push({id:b, cost:d});
+    _adj[b].push({id:a, cost:d});
+  }
+});
+
+function nearestNode(mx, my) {
+  let best = null, bestD = Infinity;
+  for(const n of ROAD_NODES) {
+    const d = Math.hypot(n.x - mx, n.y - my);
+    if(d < bestD) { bestD = d; best = n; }
+  }
+  return best;
+}
+
+function astar(startId, goalId) {
+  const open = new Map();
+  const gScore = {}; const fScore = {}; const came = {};
+  for(const n of ROAD_NODES) { gScore[n.id] = Infinity; fScore[n.id] = Infinity; }
+  gScore[startId] = 0;
+  const g = _nodeMap[goalId];
+  fScore[startId] = Math.hypot(_nodeMap[startId].x-g.x, _nodeMap[startId].y-g.y);
+  open.set(startId, fScore[startId]);
+
+  while(open.size) {
+    // Pick lowest fScore from open
+    let cur = null, curF = Infinity;
+    for(const [id,f] of open) { if(f < curF) { curF = f; cur = id; } }
+    if(!cur) break;
+    if(cur === goalId) {
+      // Reconstruct
+      const path = []; let c = cur;
+      while(came[c]) { path.unshift(_nodeMap[c]); c = came[c]; }
+      path.unshift(_nodeMap[c]);
+      return path;
+    }
+    open.delete(cur);
+    for(const nb of (_adj[cur]||[])) {
+      const tent = gScore[cur] + nb.cost;
+      if(tent < gScore[nb.id]) {
+        came[nb.id] = cur;
+        gScore[nb.id] = tent;
+        fScore[nb.id] = tent + Math.hypot(_nodeMap[nb.id].x-g.x, _nodeMap[nb.id].y-g.y);
+        open.set(nb.id, fScore[nb.id]);
+      }
+    }
+  }
+  return null;
+}
+
+let _cachedPath = null; // array of {x,y} map points
+
+function computePath(fromB, toB) {
+  const fx = fromB.x + fromB.w/2, fy = fromB.y + fromB.h/2;
+  const tx = toB.x   + toB.w/2,   ty = toB.y   + toB.h/2;
+  const sn = nearestNode(fx, fy);
+  const en = nearestNode(tx, ty);
+  const roadPath = astar(sn.id, en.id);
+  if(!roadPath) { _cachedPath = [{x:fx,y:fy},{x:tx,y:ty}]; return; }
+  _cachedPath = [{x:fx,y:fy}, ...roadPath, {x:tx,y:ty}];
+}
+
+function drawBuilding(b) {
+  const isFiltered = activeFilter !== 'all' && b.category !== activeFilter;
+  const alpha = isFiltered ? 0.15 : 1;
+  const isSelected = selectedBuilding && selectedBuilding.id === b.id;
+  const isHover = highlightedBuilding && highlightedBuilding.id === b.id;
+  const pulse = Math.sin(animFrame * 0.05) * 0.15 + 0.85;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Scale h3d: map pixel units → vertical world units visible in projection
+  // The tilt compresses depth; we scale heights up so they're clearly visible
+  const H_SCALE = 1.8;
+  const hz = b.h3d * H_SCALE;
+
+  if (view3D && b.h3d > 3) {
+    // 8 corners of the box
+    // Ground corners
+    const g_tl = project(b.x,       b.y,       0);
+    const g_tr = project(b.x + b.w, b.y,       0);
+    const g_bl = project(b.x,       b.y + b.h, 0);
+    const g_br = project(b.x + b.w, b.y + b.h, 0);
+    // Roof corners
+    const r_tl = project(b.x,       b.y,       hz);
+    const r_tr = project(b.x + b.w, b.y,       hz);
+    const r_bl = project(b.x,       b.y + b.h, hz);
+    const r_br = project(b.x + b.w, b.y + b.h, hz);
+
+    const col = b.color;
+    const glowAlpha = isSelected ? 0.95 : isHover ? 0.75 : 0.55;
+
+    // ── SOUTH FACE (bottom edge, y+h — faces viewer in default tilt) ────
+    ctx.beginPath();
+    ctx.moveTo(g_bl.x, g_bl.y); ctx.lineTo(g_br.x, g_br.y);
+    ctx.lineTo(r_br.x, r_br.y); ctx.lineTo(r_bl.x, r_bl.y);
+    ctx.closePath();
+    ctx.fillStyle   = hexAlpha(col, isSelected ? 0.55 : isHover ? 0.4 : 0.28);
+    ctx.strokeStyle = hexAlpha(col, glowAlpha);
+    ctx.lineWidth   = isSelected ? 1.8 : 1;
+    if (isSelected || isHover) { ctx.shadowColor = col; ctx.shadowBlur = isSelected ? 18 : 8; }
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // ── EAST FACE (right edge, x+w) ──────────────────────────────────────
+    ctx.beginPath();
+    ctx.moveTo(g_tr.x, g_tr.y); ctx.lineTo(g_br.x, g_br.y);
+    ctx.lineTo(r_br.x, r_br.y); ctx.lineTo(r_tr.x, r_tr.y);
+    ctx.closePath();
+    ctx.fillStyle   = hexAlpha(col, isSelected ? 0.4 : isHover ? 0.3 : 0.18);
+    ctx.strokeStyle = hexAlpha(col, glowAlpha * 0.7);
+    ctx.lineWidth   = 0.8;
+    ctx.fill(); ctx.stroke();
+
+    // ── TOP / ROOF FACE ──────────────────────────────────────────────────
+    ctx.beginPath();
+    ctx.moveTo(r_tl.x, r_tl.y); ctx.lineTo(r_tr.x, r_tr.y);
+    ctx.lineTo(r_br.x, r_br.y); ctx.lineTo(r_bl.x, r_bl.y);
+    ctx.closePath();
+    if (isSelected) {
+      const grd = ctx.createLinearGradient(r_tl.x, r_tl.y, r_br.x, r_br.y);
+      grd.addColorStop(0, hexAlpha(col, 0.75));
+      grd.addColorStop(1, hexAlpha(col, 0.45));
+      ctx.fillStyle = grd;
+    } else if (isHover) {
+      ctx.fillStyle = hexAlpha(col, 0.45 * pulse);
+    } else {
+      ctx.fillStyle = hexAlpha(col, 0.30);
+    }
+    ctx.strokeStyle = hexAlpha(col, isSelected || isHover ? 1 : 0.55);
+    ctx.lineWidth   = isSelected ? 2 : isHover ? 1.5 : 1;
+    if (isSelected || isHover) { ctx.shadowColor = col; ctx.shadowBlur = isSelected ? 22 : 10; }
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // ── NORTH FACE (top edge, y — faint, partly behind) ─────────────────
+    ctx.beginPath();
+    ctx.moveTo(g_tl.x, g_tl.y); ctx.lineTo(g_tr.x, g_tr.y);
+    ctx.lineTo(r_tr.x, r_tr.y); ctx.lineTo(r_tl.x, r_tl.y);
+    ctx.closePath();
+    ctx.fillStyle   = hexAlpha(col, 0.06);
+    ctx.strokeStyle = hexAlpha(col, 0.20);
+    ctx.lineWidth   = 0.6;
+    ctx.fill(); ctx.stroke();
+
+    // ── GLOW HALO for selected ────────────────────────────────────────────
+    if (isSelected) {
+      const cx = (r_tl.x + r_br.x) / 2, cy = (r_tl.y + r_br.y) / 2;
+      const radius = Math.max(b.w, b.h) * cam.zoom * 0.7 * pulse;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, hexAlpha(col, 0.35 * pulse));
+      grad.addColorStop(1, hexAlpha(col, 0));
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+    }
+
+  } else {
+    // ── FLAT TOP-DOWN VIEW ───────────────────────────────────────────────
+    const tl = project(b.x, b.y, 0);
+    const tr = project(b.x + b.w, b.y, 0);
+    const br = project(b.x + b.w, b.y + b.h, 0);
+    const bl = project(b.x, b.y + b.h, 0);
+    ctx.beginPath();
+    ctx.moveTo(tl.x, tl.y); ctx.lineTo(tr.x, tr.y);
+    ctx.lineTo(br.x, br.y); ctx.lineTo(bl.x, bl.y);
+    ctx.closePath();
+    ctx.fillStyle   = hexAlpha(b.color, isSelected ? 0.6 : isHover ? 0.4 : 0.25);
+    ctx.strokeStyle = hexAlpha(b.color, isSelected || isHover ? 1 : 0.5);
+    ctx.lineWidth   = isSelected ? 2 : 1;
+    if (isSelected) { ctx.shadowColor = b.color; ctx.shadowBlur = 15; }
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── LABEL ────────────────────────────────────────────────────────────────
+  if (!isFiltered) {
+    const top = project(b.x + b.w / 2, b.y + b.h / 2, hz + 4);
+    const labelSize = Math.max(8, Math.min(12, 9.5 * cam.zoom));
+    ctx.font        = `600 ${labelSize}px 'Rajdhani', sans-serif`;
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle   = isSelected || isHover ? b.color : hexAlpha(b.color, 0.85);
+    if (isSelected || isHover) { ctx.shadowColor = b.color; ctx.shadowBlur = 8; }
+    const shortName = b.name.length > 14 ? b.name.substring(0, 13) + '…' : b.name;
+    ctx.fillText(shortName, top.x, top.y - 2);
+    ctx.shadowBlur = 0;
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawDirectionPath() {
+  if(!directionFrom || !directionTo || !_cachedPath || _cachedPath.length < 2) return;
+
+  ctx.save();
+  const pts = _cachedPath;
+
+  // Build screen points (elevated slightly above ground)
+  const sPts = pts.map(p => project(p.x, p.y, 5));
+
+  // Glow under-layer
+  ctx.strokeStyle = 'rgba(255,107,0,0.25)';
+  ctx.lineWidth   = 10 * cam.zoom;
+  ctx.lineJoin    = 'round'; ctx.lineCap = 'round';
+  ctx.shadowColor = '#ff6b00'; ctx.shadowBlur = 20;
+  ctx.beginPath();
+  sPts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Animated dashes
+  ctx.strokeStyle = '#ff6b00';
+  ctx.lineWidth   = 3.5 * cam.zoom;
+  ctx.setLineDash([10*cam.zoom, 7*cam.zoom]);
+  ctx.lineDashOffset = -pathAnim * cam.zoom * 0.6;
+  ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  sPts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  ctx.stroke();
+  ctx.setLineDash([]); ctx.shadowBlur = 0;
+
+  // Start marker (green dot)
+  const sp = project(pts[0].x, pts[0].y, directionFrom.h3d + 12);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#00ff88';
+  ctx.shadowColor = '#00ff88'; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.arc(sp.x, sp.y, 5*cam.zoom, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Destination pin (animated bounce)
+  const bounce = Math.sin(animFrame * 0.12) * 4 * cam.zoom;
+  const dp = project(pts[pts.length-1].x, pts[pts.length-1].y, directionTo.h3d + 14 + bounce / cam.zoom);
+  ctx.font = `${22*cam.zoom}px sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#ff6b00'; ctx.shadowBlur = 15;
+  ctx.fillText('📍', dp.x, dp.y);
+  ctx.shadowBlur = 0;
+
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawMinimap() {
+  const mw = 80, mh = 80;
+  mmCtx.clearRect(0, 0, mw, mh);
+  mmCtx.fillStyle = '#020810';
+  mmCtx.fillRect(0, 0, mw, mh);
+
+  const sx = mw / MAP_W, sy = mh / MAP_H;
+  for(const b of BUILDINGS) {
+    const isFiltered = activeFilter !== 'all' && b.category !== activeFilter;
+    mmCtx.globalAlpha = isFiltered ? 0.15 : 0.8;
+    mmCtx.fillStyle = b.color;
+    mmCtx.fillRect(b.x*sx, b.y*sy, b.w*sx, b.h*sy);
+  }
+  // Simple viewport box using panX/panY
+  const vpCx = (MAP_CX - cam.panX/cam.zoom) * sx;
+  const vpCy = (MAP_CY - cam.panY/cam.zoom) * sy;
+  const vpW  = (W / cam.zoom) * sx * 0.5;
+  const vpH  = (H / cam.zoom) * sy * 0.5;
+  mmCtx.globalAlpha = 1;
+  mmCtx.strokeStyle = 'rgba(0,245,255,0.7)';
+  mmCtx.lineWidth = 1;
+  mmCtx.strokeRect(vpCx - vpW/2, vpCy - vpH/2, vpW, vpH);
+}
+
+function draw() {
+  animFrame++;
+  pathAnim = (pathAnim + 2) % 200;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#020810';
+  ctx.fillRect(0, 0, W, H);
+
+  drawGrid();
+  drawGround();
+
+  // Sort back-to-front using projected screen Y of each building's ground centre
+  // This handles any yaw rotation correctly
+  const sorted = [...BUILDINGS].sort((a, b) => {
+    const pa = project(a.x + a.w/2, a.y + a.h/2, 0);
+    const pb = project(b.x + b.w/2, b.y + b.h/2, 0);
+    return pa.y - pb.y;
+  });
+  for(const b of sorted) drawBuilding(b);
+
+  drawDirectionPath();
+  drawMinimap();
+
+  requestAnimationFrame(draw);
+}
+
+// ══════════════════════════════════════════
+// HIT TESTING
+// ══════════════════════════════════════════
+function hitTest(sx, sy) {
+  // Convert screen → map coords (flat)
+  const mp = toMap(sx, sy);
+  // Check in reverse draw order
+  const sorted = [...BUILDINGS].sort((a,b) => (b.y+b.h) - (a.y+a.h));
+  for(const b of sorted) {
+    if(mp.x >= b.x && mp.x <= b.x+b.w && mp.y >= b.y && mp.y <= b.y+b.h) {
+      if(activeFilter === 'all' || b.category === activeFilter) return b;
+    }
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════
+// PANEL
+// ══════════════════════════════════════════
+const catMeta = {
+  event: {label:'EVENT VENUE', color:'#ff0080'},
+  food: {label:'FOOD & DRINK', color:'#ff6b00'},
+  academic: {label:'ACADEMIC BLOCK', color:'#00f5ff'},
+  facility: {label:'FACILITY', color:'#38bdf8'},
+  parking: {label:'ENTRANCE / PARKING', color:'#fbbf24'},
+};
+
+function openPanel(b) {
+  selectedBuilding = b;
+  const meta = catMeta[b.category] || {label:'LOCATION', color:'#00f5ff'};
+  document.getElementById('panel-category').textContent = meta.label;
+  document.getElementById('panel-category').style.color = meta.color;
+  document.getElementById('panel-name').textContent = b.fullName || b.name;
+  document.getElementById('panel-name').style.color = b.color;
+  document.getElementById('panel-desc').textContent = b.desc;
+  const tagsEl = document.getElementById('panel-tags');
+  tagsEl.innerHTML = b.tags.map(t => `<span class="tag" style="color:${b.color};border-color:${hexAlpha2(b.color,0.3)};background:${hexAlpha2(b.color,0.08)}">${t}</span>`).join('');
+  document.getElementById('infopanel').classList.add('open');
+}
+
+function hexAlpha2(hex, a) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), bl=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${bl},${a})`;
+}
+
+function closePanel() {
+  document.getElementById('infopanel').classList.remove('open');
+  selectedBuilding = null;
+}
+
+document.getElementById('panel-close').onclick = closePanel;
+
+// Directions
+document.getElementById('btn-directions').onclick = () => {
+  if(!selectedBuilding) return;
+  if(!directionFrom) {
+    directionFrom = selectedBuilding;
+    _cachedPath = null;
+    showToast(`FROM: ${selectedBuilding.name} — Now tap destination`);
+    closePanel();
+  } else {
+    directionTo = selectedBuilding;
+    computePath(directionFrom, directionTo);
+    showToast(`Route: ${directionFrom.name} → ${directionTo.name}`);
+    closePanel();
+    setTimeout(() => { directionFrom = null; directionTo = null; _cachedPath = null; }, 12000);
+  }
+};
+
+document.getElementById('btn-share').onclick = () => {
+  showToast('📋 Location copied!');
+};
+
+// ══════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ══════════════════════════════════════════
+// POINTER / TOUCH EVENTS
+// ══════════════════════════════════════════
+let pointerMoved = false;
+
+canvas.addEventListener('pointerdown', e => {
+  // Right-click or ctrl+click = orbit mode
+  if(e.button === 2 || e.ctrlKey) {
+    orbitDragging = true;
+    orbitStart = {x: e.clientX, y: e.clientY, rotY: cam.rotY, tilt: cam.tilt};
+    e.preventDefault(); return;
+  }
+  isDragging = true; pointerMoved = false;
+  pointerStart = {x: e.clientX - cam.panX, y: e.clientY - cam.panY};
+  lastTouch = {x: e.clientX, y: e.clientY};
+});
+
+canvas.addEventListener('pointermove', e => {
+  if(orbitDragging) {
+    const dx = (e.clientX - orbitStart.x) / W;
+    const dy = (e.clientY - orbitStart.y) / H;
+    cam.rotY = orbitStart.rotY + dx * Math.PI * 1.5;
+    cam.tilt = Math.max(0.1, Math.min(1.4, orbitStart.tilt + dy * Math.PI));
+    return;
+  }
+  if(isDragging) {
+    const dx = e.clientX - lastTouch.x;
+    const dy = e.clientY - lastTouch.y;
+    if(Math.abs(dx) > 3 || Math.abs(dy) > 3) pointerMoved = true;
+    cam.panX = e.clientX - pointerStart.x;
+    cam.panY = e.clientY - pointerStart.y;
+    lastTouch = {x: e.clientX, y: e.clientY};
+  } else {
+    highlightedBuilding = hitTest(e.clientX, e.clientY);
+    canvas.style.cursor = highlightedBuilding ? 'pointer' : 'grab';
+  }
+});
+
+canvas.addEventListener('pointerup', e => {
+  if(orbitDragging) { orbitDragging = false; return; }
+  if(!pointerMoved) {
+    const b = hitTest(e.clientX, e.clientY);
+    if(b) openPanel(b); else closePanel();
+  }
+  isDragging = false;
+  canvas.style.cursor = 'grab';
+});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  cam.zoom = Math.max(0.3, Math.min(3.5, cam.zoom * delta));
+}, {passive:false});
+
+// Touch pinch-to-zoom + two-finger rotate
+let lastTouchMid = null;
+canvas.addEventListener('touchstart', e => {
+  if(e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastPinchDist = Math.sqrt(dx*dx + dy*dy);
+    lastTouchMid = {
+      x: (e.touches[0].clientX + e.touches[1].clientX)/2,
+      y: (e.touches[0].clientY + e.touches[1].clientY)/2,
+      rotY: cam.rotY, tilt: cam.tilt
+    };
+  }
+}, {passive:true});
+
+canvas.addEventListener('touchmove', e => {
+  if(e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const delta = dist / lastPinchDist;
+    cam.zoom = Math.max(0.3, Math.min(3.5, cam.zoom * delta));
+    lastPinchDist = dist;
+
+    // Two-finger vertical swipe = tilt
+    const midY = (e.touches[0].clientY + e.touches[1].clientY)/2;
+    if(lastTouchMid) {
+      const ddY = (midY - lastTouchMid.y) / H;
+      cam.tilt = Math.max(0.1, Math.min(1.4, lastTouchMid.tilt + ddY * Math.PI));
+    }
+  }
+}, {passive:true});
+
+// ══════════════════════════════════════════
+// CONTROLS
+// ══════════════════════════════════════════
+document.getElementById('btn-zoomin').onclick  = () => { cam.zoom = Math.min(3.5, cam.zoom * 1.2); };
+document.getElementById('btn-zoomout').onclick = () => { cam.zoom = Math.max(0.3, cam.zoom * 0.8); };
+document.getElementById('btn-tiltup').onclick  = () => { cam.tilt = Math.max(0.05, cam.tilt - 0.12); };
+document.getElementById('btn-tiltdn').onclick  = () => { cam.tilt = Math.min(1.35, cam.tilt + 0.12); };
+document.getElementById('btn-reset').onclick   = () => { cam.panX=0; cam.panY=0; cam.zoom=0.72; cam.rotY=0; cam.tilt=0.58; showToast('VIEW RESET'); };
+document.getElementById('btn-3d').onclick      = () => {
+  view3D = !view3D;
+  if (!view3D) { cam.tilt = 0; cam.rotY = 0; } else { cam.tilt = 0.58; }
+  showToast(view3D ? '3D VIEW ON' : 'FLAT VIEW ON');
+};
+document.getElementById('compass').onclick = () => { cam.panX=0; cam.panY=0; cam.zoom=0.72; cam.rotY=0; cam.tilt=0.58; showToast('VIEW RESET'); };
+
+// ══════════════════════════════════════════
+// FILTERS
+// ══════════════════════════════════════════
+const filterColors = {event:'active-pink', food:'active-orange', facility:'active-green', academic:'active', parking:'active'};
+document.querySelectorAll('.pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.pill').forEach(p => { p.className='pill'; });
+    activeFilter = pill.dataset.filter;
+    const cls = activeFilter === 'all' ? 'active' : (filterColors[activeFilter]||'active');
+    pill.classList.add(cls);
+    closePanel();
+  });
+});
+
+// ══════════════════════════════════════════
+// SEARCH
+// ══════════════════════════════════════════
+const input = document.getElementById('searchinput');
+const sugg = document.getElementById('suggestions');
+
+input.addEventListener('input', () => {
+  const q = input.value.toLowerCase().trim();
+  if(q.length < 2) { sugg.style.display='none'; return; }
+  const matches = BUILDINGS.filter(b =>
+    b.name.toLowerCase().includes(q) ||
+    b.fullName.toLowerCase().includes(q) ||
+    b.tags.some(t => t.toLowerCase().includes(q))
+  ).slice(0, 6);
+  if(matches.length === 0) { sugg.style.display='none'; return; }
+  sugg.innerHTML = matches.map(b =>
+    `<div class="suggestion-item" data-id="${b.id}">
+      <div class="sug-dot" style="background:${b.color}"></div>
+      <div><div style="color:rgba(0,245,255,0.9)">${b.icon} ${b.fullName}</div><div style="font-size:10px;color:rgba(0,245,255,0.4);margin-top:2px">${b.tags[0]||''}</div></div>
+    </div>`
+  ).join('');
+  sugg.style.display = 'block';
+  sugg.querySelectorAll('.suggestion-item').forEach(el => {
+    el.onclick = () => {
+      const b = BUILDINGS.find(x => x.id === el.dataset.id);
+      if(b) {
+        input.value = ''; sugg.style.display='none';
+        // Pan to building
+        cam.panX = -(b.x + b.w/2 - MAP_CX) * cam.zoom;
+        cam.panY = -(b.y + b.h/2 - MAP_CY) * cam.zoom * Math.cos(cam.tilt);
+        setTimeout(() => openPanel(b), 400);
+      }
+    };
+  });
+});
+
+document.addEventListener('click', e => {
+  if(!e.target.closest('#searchbar')) sugg.style.display = 'none';
+});
+
+// ══════════════════════════════════════════
+// LEGEND
+// ══════════════════════════════════════════
+document.getElementById('legend-toggle').onclick = () => {
+  document.getElementById('legend-content').classList.toggle('show');
+};
+
+// ══════════════════════════════════════════
+// LOADING SEQUENCE
+// ══════════════════════════════════════════
+let loadPct = 0;
+const loadBar = document.getElementById('loading-bar');
+const loadInterval = setInterval(() => {
+  loadPct += Math.random() * 18;
+  if(loadPct >= 100) {
+    loadPct = 100;
+    clearInterval(loadInterval);
+    setTimeout(() => {
+      document.getElementById('loading').style.opacity = '0';
+      document.getElementById('loading').style.transition = 'opacity 0.6s';
+      setTimeout(() => document.getElementById('loading').style.display='none', 600);
+    }, 300);
+  }
+  loadBar.style.width = loadPct + '%';
+}, 80);
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+window.addEventListener('resize', () => { resize(); });
+resize();
+draw();
+
+// Welcome toast
+setTimeout(() => showToast('👆 Tap buildings · Right-drag to orbit'), 1500);
+</script>
+</body>
+</html>
